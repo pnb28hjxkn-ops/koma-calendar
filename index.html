@@ -473,6 +473,51 @@
 
 
 
+
+  /* === メモあり日ハイライト（見る専向け） === */
+  .day.hasMemo{
+    box-shadow: 0 10px 28px rgba(0,0,0,.45), 0 0 0 2px rgba(120,160,255,.22) inset;
+  }
+  .day.hasMemo::after{
+    content:"";
+    position:absolute;
+    left:10px;
+    bottom:10px;
+    width:10px;
+    height:10px;
+    border-radius:999px;
+    background: rgba(90,220,140,.95);
+    box-shadow: 0 6px 16px rgba(0,0,0,.35);
+    opacity:.95;
+  }
+
+  /* === 貼り付けインポート用モーダル === */
+  .pasteModal.hidden{ display:none; }
+  .pasteModal{ position:fixed; inset:0; z-index:10000; }
+  .pasteModalBack{ position:absolute; inset:0; background: rgba(0,0,0,.55); backdrop-filter: blur(6px); }
+  .pasteModalPanel{
+    position:absolute; left:50%; top:50%; transform: translate(-50%,-50%);
+    width: min(920px, calc(100vw - 24px));
+    height: min(720px, calc(100vh - 24px));
+    border-radius: 18px; border:1px solid rgba(255,255,255,.14);
+    background: rgba(15,19,32,.92);
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .pasteModalHead{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.10); }
+  .pasteModalTitle{ font-weight: 900; letter-spacing: .02em; }
+  .pasteModalInput{
+    flex:1 1 auto; width:100%; resize:none; border:0; outline:none;
+    padding:14px 16px; background:transparent; color: rgba(255,255,255,.92);
+    font-size: 13px; line-height: 1.6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  }
+  .pasteModalFoot{
+    padding:10px 14px; border-top:1px solid rgba(255,255,255,.10);
+    display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+  .pasteHint{ color: rgba(255,255,255,.62); font-size:12px; line-height:1.3; }
+
 </style>
 </head>
 <body>
@@ -491,6 +536,8 @@
       <button class="btn small" id="resetMonthBtn">今月リセット</button>
       <button class="btn small" id="exportBtn">エクスポート</button>
       <button class="btn small" id="importBtn">インポート</button>
+      <button class="btn small" id="copyExportBtn">コピー</button>
+      <button class="btn small" id="pasteImportBtnTop">貼り付け</button>
       <button class="btn small" id="resetBtn">全消し</button>
     </div>
   </div>
@@ -986,7 +1033,12 @@ function render(){
     memo.className = "memo";
     memo.placeholder = "メモ";
     memo.value = state.memos[key] || "";
-    memo.readOnly = true; // 直接入力でスクロールバーが出て幅を食うのを防ぐ
+    
+    // メモあり日をハイライト（見る専向け）
+    if((memo.value || "").trim().length > 0){
+      dayEl.classList.add("hasMemo");
+    }
+memo.readOnly = true; // 直接入力でスクロールバーが出て幅を食うのを防ぐ
     memo.addEventListener("click", ()=>{
       openMemoModal(key, memo);
     });
@@ -1458,6 +1510,54 @@ async function loadHolidayJsonFromFile(file){
   setHolidayOverride(obj);
 }
 
+
+/* ==========
+   Export / Import 追加（コピー&貼り付け）
+   ========== */
+async function copyExportToClipboard(){
+  const payload = JSON.stringify({state, holidayOverride: getHolidayOverride()}, null, 2);
+  try{
+    await navigator.clipboard.writeText(payload);
+    localStorage.setItem("koma_calendar_last_export_at", String(Date.now()));
+    toast("コピーしたで");
+  }catch(e){
+    // fallback: 手動コピー
+    prompt("コピーできへんかったから、これを手動でコピーしてな", payload);
+  }
+}
+
+function openPasteImportModal(prefill=""){
+  const modal = document.getElementById("pasteModal");
+  const input = document.getElementById("pasteModalInput");
+  input.value = prefill;
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden","false");
+  setTimeout(()=> input && input.focus(), 0);
+}
+function closePasteImportModal(){
+  const modal = document.getElementById("pasteModal");
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden","true");
+}
+function doPasteImport(){
+  const txt = (document.getElementById("pasteModalInput").value || "").trim();
+  if(!txt){ toast("空っぽやで"); return; }
+  try{
+    const obj = JSON.parse(txt);
+    if(obj.state) state = obj.state;
+    else state = obj;
+    if(obj.holidayOverride){
+      setHolidayOverride(obj.holidayOverride);
+    }
+    saveState();
+    toast("貼り付けインポート完了");
+    closePasteImportModal();
+    render();
+  }catch(e){
+    alert("インポート失敗: JSON形式が違うかも");
+  }
+}
+
 /* ==========
    Wire up
    ========== */
@@ -1479,6 +1579,37 @@ $("#applyRanges").addEventListener("click", applyRanges);
 
 $("#exportBtn").addEventListener("click", exportState);
 $("#importBtn").addEventListener("click", importState);
+
+
+// copy/paste export/import
+const _copyBtn = document.getElementById("copyExportBtn");
+if(_copyBtn) _copyBtn.addEventListener("click", copyExportToClipboard);
+
+const _pasteTop = document.getElementById("pasteImportBtnTop");
+if(_pasteTop) _pasteTop.addEventListener("click", ()=>openPasteImportModal());
+
+// paste modal wiring
+const _pmClose = document.getElementById("pasteModalClose");
+const _pmBack = document.querySelector("#pasteModal .pasteModalBack");
+if(_pmClose) _pmClose.addEventListener("click", closePasteImportModal);
+if(_pmBack) _pmBack.addEventListener("click", closePasteImportModal);
+
+const _pmClear = document.getElementById("pasteClearBtn");
+if(_pmClear) _pmClear.addEventListener("click", ()=>{
+  const inp = document.getElementById("pasteModalInput");
+  if(inp){ inp.value=""; inp.focus(); }
+});
+
+const _pmImport = document.getElementById("pasteImportBtn");
+if(_pmImport) _pmImport.addEventListener("click", doPasteImport);
+
+document.addEventListener("keydown", (e)=>{
+  if(e.key === "Escape"){
+    const modal = document.getElementById("pasteModal");
+    if(modal && !modal.classList.contains("hidden")) closePasteImportModal();
+  }
+});
+
 $("#resetBtn").addEventListener("click", resetAll);
 
 $("#loadHolidayJsonBtn").addEventListener("click", ()=> $("#holidayFile").click());
@@ -1534,6 +1665,15 @@ $("#clearHolidayJsonBtn").addEventListener("click", ()=>{
     state.memos[memoOpenKey] = input.value;
     saveState();
     if(memoOpenCellEl) memoOpenCellEl.value = input.value;
+    // メモあり日ハイライト更新
+    try{
+      const day = memoOpenCellEl && memoOpenCellEl.closest && memoOpenCellEl.closest(".day");
+      if(day){
+        if((input.value||"").trim().length>0) day.classList.add("hasMemo");
+        else day.classList.remove("hasMemo");
+      }
+    }catch{}
+
     setSavedLabel("Saved ✓");
     clearTimeout(savedT);
     savedT = setTimeout(()=> setSavedLabel(""), 900);
@@ -1558,5 +1698,25 @@ $("#clearHolidayJsonBtn").addEventListener("click", ()=>{
   }
 })();
 </script>
+
+<!-- 貼り付けインポート用モーダル -->
+<div id="pasteModal" class="pasteModal hidden" aria-hidden="true">
+  <div class="pasteModalBack"></div>
+  <div class="pasteModalPanel" role="dialog" aria-modal="true">
+    <div class="pasteModalHead">
+      <div class="pasteModalTitle">インポート（貼り付け）</div>
+      <button class="btn ghost" id="pasteModalClose" type="button">×</button>
+    </div>
+    <textarea id="pasteModalInput" class="pasteModalInput" placeholder="ここにエクスポートJSONを貼り付けてな"></textarea>
+    <div class="pasteModalFoot">
+      <div class="pasteHint">PC→スマホは「コピー」→スマホで「貼り付け」が楽やで。</div>
+      <div class="btnrow">
+        <button class="btn small" id="pasteClearBtn" type="button">消す</button>
+        <button class="btn small primary" id="pasteImportBtn" type="button">この内容でインポート</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

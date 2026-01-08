@@ -486,7 +486,7 @@
     width:10px;
     height:10px;
     border-radius:999px;
-    background: rgba(90,220,140,.95);
+    background: rgba(120,160,255,.95);
     box-shadow: 0 6px 16px rgba(0,0,0,.35);
     opacity:.95;
   }
@@ -1697,6 +1697,105 @@ $("#clearHolidayJsonBtn").addEventListener("click", ()=>{
     render();
   }
 })();
+
+/* =============================
+   ✅ PC/スマホ両対応：コピー＆貼り付け インポート配線（修正版）
+   ============================= */
+(function(){
+  function onTap(el, handler){
+    if(!el) return;
+    el.addEventListener("click", handler);
+    el.addEventListener("touchstart", function(e){
+      try{ e.preventDefault(); }catch(_){}
+      handler(e);
+    }, {passive:false});
+  }
+
+  // Fallbacks if missing
+  if(typeof openPasteImportModal !== "function"){
+    window.openPasteImportModal = function(prefill=""){
+      const modal = document.getElementById("pasteModal");
+      const input = document.getElementById("pasteModalInput");
+      if(!modal || !input) return;
+      input.value = prefill || "";
+      modal.classList.remove("hidden");
+      modal.setAttribute("aria-hidden","false");
+      setTimeout(()=>input.focus(), 0);
+    };
+  }
+  if(typeof closePasteImportModal !== "function"){
+    window.closePasteImportModal = function(){
+      const modal = document.getElementById("pasteModal");
+      if(!modal) return;
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden","true");
+    };
+  }
+  if(typeof doPasteImport !== "function"){
+    window.doPasteImport = function(){
+      const input = document.getElementById("pasteModalInput");
+      const txt = (input?.value || "").trim();
+      if(!txt){ (typeof toast==="function" ? toast("空っぽやで") : alert("空っぽやで")); return; }
+      try{
+        const obj = JSON.parse(txt);
+        if(obj && obj.state) state = obj.state; else state = obj;
+        if(obj && obj.holidayOverride && typeof setHolidayOverride==="function"){
+          setHolidayOverride(obj.holidayOverride);
+        }
+        if(typeof saveState==="function") saveState();
+        if(typeof toast==="function") toast("貼り付けインポート完了"); else alert("貼り付けインポート完了");
+        closePasteImportModal();
+        if(typeof render==="function") render();
+      }catch(e){
+        alert("インポート失敗: JSON形式が違うかも");
+      }
+    };
+  }
+  if(typeof copyExportToClipboard !== "function"){
+    window.copyExportToClipboard = async function(){
+      const override = (typeof getHolidayOverride==="function") ? getHolidayOverride() : null;
+      const payloadObj = override ? {state, holidayOverride: override} : {state};
+      const payload = JSON.stringify(payloadObj, null, 2);
+      try{
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(payload);
+          if(typeof toast==="function") toast("コピーしたで"); else alert("コピーしたで");
+        }else{
+          prompt("これをコピーしてな", payload);
+        }
+      }catch(e){
+        prompt("コピーできへんかったから、これを手動でコピーしてな", payload);
+      }
+    };
+  }
+
+  function wire(){
+    onTap(document.getElementById("copyExportBtn"), copyExportToClipboard);
+    onTap(document.getElementById("pasteImportBtnTop"), ()=>openPasteImportModal());
+
+    onTap(document.getElementById("pasteModalClose"), closePasteImportModal);
+    onTap(document.querySelector("#pasteModal .pasteModalBack"), closePasteImportModal);
+    onTap(document.getElementById("pasteClearBtn"), ()=>{
+      const i = document.getElementById("pasteModalInput");
+      if(i){ i.value=""; i.focus(); }
+    });
+    onTap(document.getElementById("pasteImportBtn"), doPasteImport);
+
+    document.addEventListener("keydown", (e)=>{
+      if(e.key === "Escape"){
+        const modal = document.getElementById("pasteModal");
+        if(modal && !modal.classList.contains("hidden")) closePasteImportModal();
+      }
+    });
+  }
+
+  if(document.readyState === "complete" || document.readyState === "interactive"){
+    setTimeout(wire, 0);
+  }else{
+    window.addEventListener("DOMContentLoaded", wire);
+  }
+})();
+
 </script>
 
 <!-- 貼り付けインポート用モーダル -->

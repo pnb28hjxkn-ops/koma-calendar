@@ -1,0 +1,1562 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>駒カレンダー（ドラッグで嵌めるやつ・1ファイル）</title>
+<style>
+  :root{
+    --bg:#0b1220;
+    --panel:#0f1a2e;
+    --panel2:#0d172a;
+    --card:#101c33;
+    --card2:#0f1a2d;
+    --edge:rgba(255,255,255,.08);
+    --edge2:rgba(255,255,255,.12);
+    --text:rgba(255,255,255,.88);
+    --muted:rgba(255,255,255,.62);
+    --muted2:rgba(255,255,255,.45);
+    --shadow:0 10px 28px rgba(0,0,0,.45);
+    --shadow2:0 8px 18px rgba(0,0,0,.35);
+    --radius:18px;
+    --radius2:14px;
+
+    --k:#e05a5a;   /* 公休 */
+    --d:#f0c74a;   /* 代休 */
+    --p:#5aa3ff;   /* 有給 */
+    --holiday:#ff4d4d;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+    background: radial-gradient(1100px 600px at 20% -10%, rgba(70,110,255,.18), transparent 60%),
+                radial-gradient(900px 540px at 90% 0%, rgba(255,80,120,.16), transparent 60%),
+                radial-gradient(900px 520px at 70% 120%, rgba(80,255,220,.10), transparent 60%),
+                var(--bg);
+    color:var(--text);
+    overflow-x:hidden;
+  }
+  header{
+    position:sticky; top:0;
+    background: linear-gradient(180deg, rgba(7,11,20,.92), rgba(7,11,20,.72));
+    backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--edge);
+    z-index:20;
+  }
+  .topbar{
+    display:flex; gap:10px; align-items:center; justify-content:space-between;
+    padding:10px 14px;
+    max-width:1400px; margin:0 auto;
+  }
+  .title{
+    display:flex; align-items:center; gap:10px;
+    font-weight:700;
+    letter-spacing:.2px;
+  }
+  .pill{
+    font-size:12px;
+    padding:4px 10px;
+    border-radius:999px;
+    border:1px solid var(--edge);
+    background:rgba(255,255,255,.04);
+    color:var(--muted);
+  }
+  .btn{
+    border:1px solid var(--edge);
+    background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+    color:var(--text);
+    padding:7px 10px;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:600;
+    transition: transform .05s ease, border-color .15s ease, background .15s ease;
+    user-select:none;
+  }
+  .btn:hover{ border-color: rgba(255,255,255,.18); }
+  .btn:active{ transform: translateY(1px); }
+  .btn.primary{ border-color: rgba(90,163,255,.35); }
+  .btn.k{ border-color: rgba(224,90,90,.40); }
+  .btn.d{ border-color: rgba(240,199,74,.40); }
+  .btn.p{ border-color: rgba(90,163,255,.40); }
+  .btn.danger{ border-color: rgba(255,90,90,.35); background: linear-gradient(180deg, rgba(255,90,90,.16), rgba(255,90,90,.06)); }
+  .btn.ghost{ background: transparent; }
+  .btn.small{ padding:6px 9px; border-radius:10px; font-size:12px; }
+  .btnrow{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  .wrap{
+    max-width:1400px;
+    margin:12px auto 24px;
+    padding:0 14px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns: 1.35fr .85fr;
+    gap:12px;
+    align-items:start;
+  }
+  @media (max-width: 1080px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+    border:1px solid var(--edge);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow:hidden;
+  }
+  .panel .head{
+    padding:14px 14px 10px;
+    border-bottom:1px solid var(--edge);
+    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+  }
+  .monthTitle{
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .monthTitle .ym{ font-weight:800; font-size:20px; }
+  .monthTitle .sub{ color:var(--muted); font-size:12px; line-height:1.3; }
+  .saved{ color:rgba(170,220,255,.85); font-size:12px; padding-top:6px; }
+
+  .dow{
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap:8px;
+    padding:10px 12px 0;
+  }
+  .dow div{
+    text-align:center;
+    font-weight:800;
+    font-size:12px;
+    color:var(--muted);
+    padding:7px 0;
+    border-radius: 12px;
+    border:1px solid var(--edge);
+    background: rgba(255,255,255,.03);
+  }
+  .dow .sun{ color: rgba(255,90,90,.92); }
+  .dow .sat{ color: rgba(110,170,255,.92); }
+
+  .cal{
+    padding:10px 12px 14px;
+    display:grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap:10px;
+  }
+  .day{
+    position:relative;
+    min-height: 130px;
+    border-radius: var(--radius2);
+    border:1px solid var(--edge);
+    background: radial-gradient(400px 220px at 20% 0%, rgba(120,160,255,.10), transparent 60%),
+                radial-gradient(300px 220px at 80% 0%, rgba(255,120,160,.08), transparent 60%),
+                rgba(255,255,255,.02);
+    box-shadow: var(--shadow2);
+    padding:10px;
+    overflow:hidden;
+  }
+  .day.out{ opacity:.33; }
+  .day.dragover{
+    outline: 2px solid rgba(90,163,255,.55);
+    outline-offset: -2px;
+  }
+  .dateNum{
+    position:absolute; left:10px; top:8px;
+    font-weight:900;
+    font-size:14px;
+    color:rgba(255,255,255,.92);
+    letter-spacing:.2px;
+  }
+
+  /* 休日ヒント：二文字固定・赤・幅決め打ち */
+  .holidayHint{
+    position:absolute;
+    left:10px;
+    top:30px;
+    width: 40px;        /* ←決め打ち */
+    height: 18px;
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    font-weight:900;
+    font-size:12px;
+    letter-spacing:.2px;
+    color: var(--holiday);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:clip;
+    pointer-events:auto;
+    cursor:help;
+  }
+  .holidayHint::after{
+    content:"休日";      /* ←二文字固定 */
+  }
+
+.holidayName{
+  position:absolute;
+  right:10px;
+  top:8px;
+
+  /* ←ここを増やすと収まりやすい（ただし右上トークンと干渉しない範囲で） */
+  max-width: 65%;
+
+  /* 文字を小さく＆詰める */
+  font-size: 10px;                 /* 11→10 くらいが効く */
+  letter-spacing: -0.02em;         /* ちょい詰め */
+
+  /* ピルの余白を削る */
+  padding: 1px 6px;                /* 2px 8px → 詰め */
+  border-radius:999px;
+
+  color: rgba(255,160,170,.95);
+  background: rgba(255,60,90,.08);
+  border:1px solid rgba(255,90,120,.22);
+
+  /* 1行固定 */
+  white-space: nowrap;
+
+  /* …は出さない（はみ出たら単にクリップ） */
+  overflow: hidden;
+  text-overflow: clip;
+
+
+}
+
+  .holidayName:empty{ display:none; }
+
+  /* トークン置き場：右上固定（メモと被らないように余白確保） */
+  .tokenLane{
+    position:absolute;
+    right:10px;
+    top:34px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    justify-content:flex-end;
+    align-items:flex-start;
+    min-height: 26px;
+    max-width: 52%;
+    padding-left: 6px;
+    pointer-events:auto;
+  }
+
+  /* メモ領域：上は tokenLane 分あける */
+  .memo{
+    position:absolute;
+    left:10px;
+    right:10px;
+    top:64px;                 /* tokenLane + 少し余白 */
+    bottom:10px;
+    width:auto;
+    resize:none;
+    border-radius: 12px;
+    border:1px solid rgba(255,255,255,.10);
+    background: rgba(0,0,0,.18);
+    color:var(--text);
+    padding:8px 10px;
+    font-size:12px;
+    line-height:1.35;
+    outline:none;
+  }
+  .memo::placeholder{ color: rgba(169,179,209,.70); }
+
+  .token{
+    width:28px; height:28px;
+    border-radius: 999px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:900;
+    font-size:12px;
+    letter-spacing:.3px;
+    color: rgba(255,255,255,.95);
+    border:1px solid rgba(255,255,255,.18);
+    box-shadow: 0 8px 14px rgba(0,0,0,.35);
+    cursor:grab;
+    user-select:none;
+  }
+  .token:active{ cursor:grabbing; }
+  .token.k{ background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.35), transparent 42%), rgba(224,90,90,.95); }
+  .token.d{ background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.28), transparent 45%), rgba(240,199,74,.95); color: rgba(30,22,10,.92); border-color: rgba(255,255,255,.22); }
+  .token.p{ background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.30), transparent 45%), rgba(90,163,255,.95); }
+
+
+  /* 無限アイコンコマ */
+  .token.h{ background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.30), transparent 45%), rgba(90, 205, 140, .95); }
+  .token.g{ background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.30), transparent 45%), rgba(255, 176, 80, .95); }
+  .token.u{ background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.30), transparent 45%), rgba(180, 120, 255, .95); }
+
+  .iconpool{ display:flex; gap:8px; flex-wrap:wrap; }
+  .trash{
+    height:48px;
+    border-radius:14px;
+    border:1px dashed rgba(255,255,255,.25);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background: rgba(0,0,0,.18);
+    color: rgba(255,255,255,.85);
+    user-select:none;
+  }
+  .trash.dragover{ outline:2px solid rgba(255,120,120,.55); background: rgba(255,60,60,.12); }
+
+  .side{
+    padding:14px;
+  }
+  .side h3{
+    margin:0 0 8px;
+    font-size:14px;
+    letter-spacing:.2px;
+  }
+  .help{
+    margin-top:-4px;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.45;
+  }
+  .section{
+    margin-top:12px;
+    border:1px solid var(--edge);
+    border-radius: var(--radius);
+    background: rgba(255,255,255,.02);
+    padding:12px;
+  }
+  .row{
+    display:flex; justify-content:space-between; gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:7px 10px;
+    border-radius: 999px;
+    border:1px solid var(--edge);
+    background: rgba(255,255,255,.03);
+    font-size:12px;
+    color:var(--text);
+  }
+  .dot{
+    width:10px; height:10px; border-radius:999px;
+    background: rgba(255,255,255,.2);
+    border:1px solid rgba(255,255,255,.22);
+  }
+  .dot.k{ background: var(--k); }
+  .dot.d{ background: var(--d); }
+  .dot.p{ background: var(--p); }
+
+  .pool{
+    min-height: 42px;
+    border-radius: 14px;
+    border:1px dashed rgba(255,255,255,.14);
+    padding:10px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    background: rgba(0,0,0,.12);
+  }
+  .pool.dragover{ outline:2px solid rgba(90,163,255,.55); outline-offset:-2px; }
+  .poolTitle{
+    font-weight:900;
+    font-size:12px;
+    color:rgba(255,255,255,.86);
+    margin:0 0 6px;
+  }
+  .smallmuted{ color:var(--muted2); font-size:12px; }
+
+  input[type="number"], input[type="date"]{
+    background: rgba(0,0,0,.18);
+    border:1px solid rgba(255,255,255,.12);
+    color:var(--text);
+    border-radius:12px;
+    padding:8px 10px;
+    outline:none;
+  }
+
+  .footerBtns{
+    display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;
+  }
+
+  .filepick{ display:none; }
+
+  .toast{
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    padding:10px 12px;
+    border-radius: 14px;
+    border:1px solid var(--edge);
+    background: rgba(10,18,32,.86);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-size:12px;
+    opacity:0;
+    transform: translateY(8px);
+    transition: opacity .18s ease, transform .18s ease;
+    z-index:50;
+  }
+  .toast.show{ opacity:1; transform: translateY(0); }
+
+  /* ===== メモ拡大UI（モーダル編集） ===== */
+  /* マス内メモはプレビュー扱い：スクロールバーで幅を食わない */
+  .memo{
+    resize:none !important;
+    overflow:hidden !important;
+    cursor:pointer;
+  }
+
+  .memoModal.hidden{ display:none; }
+  .memoModal{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+  }
+  .memoModalBack{
+    position:absolute; inset:0;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+  }
+  .memoModalPanel{
+    position:absolute;
+    left:50%; top:50%;
+    transform: translate(-50%,-50%);
+    width: min(920px, calc(100vw - 24px));
+    height: min(720px, calc(100vh - 24px));
+    border-radius: 18px;
+    border:1px solid rgba(255,255,255,.14);
+    background: rgba(15,19,32,.92);
+    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+  .memoModalHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:12px 14px;
+    border-bottom:1px solid rgba(255,255,255,.10);
+  }
+  .memoModalTitle{
+    font-weight: 900;
+    letter-spacing: .02em;
+  }
+  .memoModalInput{
+    flex: 1 1 auto;
+    width:100%;
+    resize:none;
+    border:0;
+    outline:none;
+    padding:14px 16px;
+    background: transparent;
+    color: rgba(255,255,255,.92);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .memoModalInput::placeholder{ color: rgba(169,179,209,.70); }
+  .memoModalFoot{
+    padding:10px 14px;
+    border-top:1px solid rgba(255,255,255,.10);
+    display:flex;
+    justify-content:flex-end;
+  }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+
+.holidayHint,
+.holidayName{
+  cursor: default !important;
+}
+
+
+
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="title">
+      <span>駒カレンダー（ドラッグで嵌めるやつ）</span>
+      <span class="pill">ローカル保存: localStorage</span>
+    </div>
+    <div class="btnrow">
+      <button class="btn small" id="prevBtn">◀ 前月</button>
+      <button class="btn small" id="nextBtn">次月 ▶</button>
+      <button class="btn small primary" id="todayBtn">今月へ</button>
+      <button class="btn small k" id="genKBtn">公休コマ再生成</button>
+      <button class="btn small danger" id="monthEndBtn">月末処理（余り公休→代休）</button>
+      <button class="btn small" id="resetMonthBtn">今月リセット</button>
+      <button class="btn small" id="exportBtn">エクスポート</button>
+      <button class="btn small" id="importBtn">インポート</button>
+      <button class="btn small" id="resetBtn">全消し</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <div class="panel">
+      <div class="head">
+        <div class="monthTitle">
+          <div class="ym" id="ym"></div>
+          <div class="sub">日曜・祝日・第1/第3土曜は薄くマーキング。そこに「公休K」を嵌める想定。<br>
+            祝日は右上の「祝日名」表示（JSONで上書きOK）。</div>
+        </div>
+        <div class="saved" id="saveStateLabel"></div>
+      </div>
+
+      <div class="dow">
+        <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div><div class="sun">日</div>
+      </div>
+      <div class="cal" id="cal"></div>
+    </div>
+
+    <div class="panel side">
+      <h3>コマ置き場（プール）</h3>
+      <div class="help">ここから掴んで日付マスにドロップ。マス内からプールに戻すのもOK。</div>
+
+      <div class="section">
+        <div class="row">
+          <div style="font-weight:900">残数</div>
+          <div class="smallmuted" id="counts">K:0 / D:0 / P:0</div>
+        </div>
+        <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap">
+          <span class="badge"><span class="dot k"></span>公休 <b id="countK">0</b></span>
+          <span class="badge"><span class="dot d"></span>代休 <b id="countD">0</b></span>
+          <span class="badge"><span class="dot p"></span>有給 <b id="countP">0</b></span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="poolTitle">公休（当月分）</div>
+        <div class="pool" id="poolK" data-pool="K"></div>
+      </div>
+
+      <div class="section">
+        <div class="row" style="margin-bottom:6px">
+          <div class="poolTitle" style="margin:0">代休（期限なし）</div>
+          <div class="btnrow">
+            <button class="btn small d" id="dPlus">代休 +1</button>
+            <button class="btn small d" id="dMinus">代休 -1</button>
+          </div>
+        </div>
+        <div class="pool" id="poolD" data-pool="D"></div>
+      </div>
+
+      <div class="section">
+        <div class="row" style="margin-bottom:6px">
+          <div class="poolTitle" style="margin:0">有給（半休なし）</div>
+          <div class="btnrow">
+            <span class="smallmuted">初期有給:</span>
+            <input type="number" id="pInit" min="0" step="1" style="width:90px" />
+            <button class="btn small p" id="pApply">適用</button>
+          </div>
+        </div>
+        <div class="pool" id="poolP" data-pool="P"></div>
+      </div>
+
+      <div class="section">
+        <div class="poolTitle">アイコン（無限に取り出しOK）</div>
+        <div class="help" style="margin:0 0 10px">在宅/現場/遊び などの目印用。置いても残数は減らへん。</div>
+        <div class="pool iconpool" id="iconPool"></div>
+      </div>
+
+      <div class="section">
+        <div class="poolTitle">ゴミ箱（ここにドロップで削除）</div>
+        <div id="trashBin" class="trash">🗑️ 捨てる</div>
+      </div>
+
+      <div class="section">
+        <div class="poolTitle">今月だけリセット</div>
+        <div class="help" style="margin:0 0 10px">今表示してる月のコマ＆メモだけ消す（K/D/Pはプールに戻る）。</div>
+        <button class="btn small" id="resetMonthBtn2">今月リセット</button>
+      </div>
+
+      <div class="section">
+        <div class="poolTitle">設定（祝日JSON）</div>
+        <div class="help" style="margin:0 0 10px">
+          「holidays_jp_2026.json」みたいな <b>{ "YYYY-MM-DD": "祝日名" }</b> を読み込むと、<b>HOLIDAYS を上書き</b>するで。
+        </div>
+        <div class="btnrow">
+          <button class="btn small" id="loadHolidayJsonBtn">祝日JSON読み込み</button>
+          <button class="btn small ghost" id="clearHolidayJsonBtn">上書き解除</button>
+        </div>
+        <input class="filepick" type="file" id="holidayFile" accept=".json,application/json" />
+        <div class="smallmuted" style="margin-top:10px" id="holidayStatus">上書き: なし</div>
+      </div>
+
+      <div class="section">
+        <div class="poolTitle">盆・正月・追加マーキング（公休に含める）</div>
+        <div class="help" style="margin:0 0 10px">
+          盆/正月/イレギュラー休みを期間でマーキング。<b>公休コマ再生成（K）にこの期間も含める</b>ように拡張済み。
+        </div>
+        <div class="row" style="gap:8px; margin-bottom:8px">
+          <div class="smallmuted">盆:</div>
+          <input type="date" id="obonStart" />
+          <span class="smallmuted">〜</span>
+          <input type="date" id="obonEnd" />
+        </div>
+        <div class="row" style="gap:8px; margin-bottom:10px">
+          <div class="smallmuted">正月:</div>
+          <input type="date" id="nyStart" />
+          <span class="smallmuted">〜</span>
+          <input type="date" id="nyEnd" />
+        </div>
+
+        <div class="row" style="gap:8px; margin-bottom:10px">
+          <div class="smallmuted">追加①:</div>
+          <input type="date" id="extra1Start" />
+          <span class="smallmuted">〜</span>
+          <input type="date" id="extra1End" />
+        </div>
+        <div class="row" style="gap:8px; margin-bottom:10px">
+          <div class="smallmuted">追加②:</div>
+          <input type="date" id="extra2Start" />
+          <span class="smallmuted">〜</span>
+          <input type="date" id="extra2End" />
+        </div>
+
+        <div class="btnrow">
+          <button class="btn small primary" id="applyRanges">期間反映</button>
+        </div>
+      </div>
+
+
+      <div class="section">
+        <div class="poolTitle">操作のコツ</div>
+        <div class="help" style="margin:0">
+          ・K/D/P をドラッグ → 日付へドロップ<br>
+          ・マスからプールに戻すのもOK<br>
+          ・メモは自動保存（各日付ごと）<br>
+          ・「公休コマ再生成」は、当月の休日数（祝日/日曜/第1第3土曜）ぶんKを作る（すでに置いてるKは残る）
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- メモ拡大モーダル（クリックで全面編集） -->
+<div id="memoModal" class="memoModal hidden" aria-hidden="true">
+  <div class="memoModalBack"></div>
+  <div class="memoModalPanel" role="dialog" aria-modal="true">
+    <div class="memoModalHead">
+      <div class="memoModalTitle" id="memoModalTitle">YYYY-MM-DD</div>
+      <button class="btn ghost" id="memoModalClose" type="button">×</button>
+    </div>
+    <textarea id="memoModalInput" class="memoModalInput" placeholder="メモ（ここにたっぷり書ける）"></textarea>
+    <div class="memoModalFoot">
+      <div class="smallmuted mono" id="memoModalSaved">Saved</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==========
+   データ
+   ========== */
+const STORAGE_KEY = "koma_calendar_state_v2";
+const STORAGE_HOLIDAY_OVERRIDE_KEY = "koma_calendar_holidays_override_v1";
+
+/** デフォルト祝日（最低限だけ入れてる。JSONで上書き推奨） */
+const HOLIDAYS_DEFAULT = {
+  "2026-01-01": "元日",
+  "2026-01-12": "成人の日"
+};
+
+/* ==========
+   コマ表示ラベル（見た目用）
+   ==========
+   K=公休, D=代休, P=有給
+   H=家, G=現, U=遊（無限に取り出せるアイコンコマ）
+*/
+const TOKEN_LABELS = { K:"K", D:"D", P:"P", H:"家", G:"現", U:"遊" };
+const POOL_TYPES = new Set(["K","D","P"]);
+const INFINITE_TYPES = ["H","G","U"];
+
+function tokenLabel(type){
+  return TOKEN_LABELS[type] || type;
+}
+
+/* ==========
+   祝日上書き（JSON読み込み）
+   ========== */
+function getHolidayOverride(){
+  try{
+    const raw = localStorage.getItem(STORAGE_HOLIDAY_OVERRIDE_KEY);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(!obj || typeof obj !== "object") return null;
+    return obj;
+  }catch{ return null; }
+}
+function setHolidayOverride(obj){
+  localStorage.setItem(STORAGE_HOLIDAY_OVERRIDE_KEY, JSON.stringify(obj));
+}
+function clearHolidayOverride(){
+  localStorage.removeItem(STORAGE_HOLIDAY_OVERRIDE_KEY);
+}
+function mergedHolidays(){
+  const ov = getHolidayOverride();
+  return ov ? { ...HOLIDAYS_DEFAULT, ...ov } : { ...HOLIDAYS_DEFAULT };
+}
+function holidayName(key){
+  const H = mergedHolidays();
+  return H[key] || "";
+}
+
+/* ==========
+   State
+   ========== */
+function defaultState(){
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = today.getMonth()+1;
+  return {
+    viewYear: y,
+    viewMonth: m,
+    pInit: 10,
+    ranges: {
+      obonStart: `${y}-08-13`,
+      obonEnd: `${y}-08-16`,
+      nyStart: `${y}-12-29`,
+      nyEnd: `${y+1}-01-03`,
+
+      // 追加マーキング①（例：今年の元旦〜三が日を入れたい時）
+      extra1Start: `${y}-01-01`,
+      extra1End: `${y}-01-03`,
+
+      // 追加マーキング②（イレギュラー休み用）
+      extra2Start: ``,
+      extra2End: ``,
+    },
+    // tokens: { "YYYY-MM-DD": ["K","D","P", ...] }
+    tokens: {},
+    // seq: 各種の発番（将来拡張用）
+    seq: { K:0, D:0, P:0 },
+    // memos: { "YYYY-MM-DD": "text" }
+    memos: {},
+  };
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const s = JSON.parse(raw);
+
+    // 互換：なければ追加
+    if(!s.tokens) s.tokens = {};
+    if(!s.seq) s.seq = {K:0,D:0,P:0};
+    if(!s.memos) s.memos = {};
+    if(!s.ranges) s.ranges = defaultState().ranges;
+// 互換：追加マーキング枠
+if(!("extra1Start" in s.ranges)) s.ranges.extra1Start = `${defaultState().viewYear}-01-01`;
+if(!("extra1End" in s.ranges)) s.ranges.extra1End = `${defaultState().viewYear}-01-03`;
+if(!("extra2Start" in s.ranges)) s.ranges.extra2Start = "";
+if(!("extra2End" in s.ranges)) s.ranges.extra2End = "";
+    if(typeof s.pInit !== "number") s.pInit = 10;
+    if(typeof s.viewYear !== "number" || typeof s.viewMonth !== "number"){
+      const d = defaultState();
+      s.viewYear = d.viewYear; s.viewMonth = d.viewMonth;
+    }
+    return s;
+  }catch(e){
+    console.warn("loadState failed", e);
+    return defaultState();
+  }
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  flashSaved();
+}
+let state = loadState();
+
+/* ==========
+   UI helpers
+   ========== */
+const $ = (sel)=>document.querySelector(sel);
+const calEl = $("#cal");
+const toastEl = $("#toast");
+
+let toastT = null;
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toastT);
+  toastT = setTimeout(()=>toastEl.classList.remove("show"), 1200);
+}
+function flashSaved(){
+  $("#saveStateLabel").textContent = "Saved";
+  setTimeout(()=>{ $("#saveStateLabel").textContent = ""; }, 900);
+}
+
+
+/* ==========
+   Memo Modal (クリックで全面編集)
+   ========== */
+let memoOpenKey = null;
+let memoOpenCellEl = null;
+
+function openMemoModal(key, cellEl){
+  memoOpenKey = key;
+  memoOpenCellEl = cellEl || null;
+
+  const modal = document.getElementById("memoModal");
+  const title = document.getElementById("memoModalTitle");
+  const input = document.getElementById("memoModalInput");
+  const saved = document.getElementById("memoModalSaved");
+
+  if(title) title.textContent = key;
+  if(input) input.value = state.memos[key] || "";
+  if(saved) saved.textContent = "Editing...";
+
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden","false");
+  setTimeout(()=> input && input.focus(), 0);
+}
+
+function closeMemoModal(){
+  const modal = document.getElementById("memoModal");
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden","true");
+  memoOpenKey = null;
+  memoOpenCellEl = null;
+}
+
+function pad2(n){ return String(n).padStart(2,"0"); }
+function ymd(y,m,d){ return `${y}-${pad2(m)}-${pad2(d)}`; }
+function parseYmd(s){
+  const [y,m,d] = s.split("-").map(Number);
+  return new Date(y, m-1, d);
+}
+function betweenInclusive(day, start, end){
+  if(!start || !end) return false;
+  const t = day.getTime();
+  return t >= start.getTime() && t <= end.getTime();
+}
+function monthLabel(y,m){
+  return `${y}年 ${m}月`;
+}
+
+/* ==========
+   Calendar build
+   ========== */
+function buildCalendarDays(y,m){
+  const first = new Date(y, m-1, 1);
+  const firstDow = (first.getDay()+6)%7; // Mon=0 ... Sun=6
+  const start = new Date(y, m-1, 1 - firstDow);
+  const days = [];
+  for(let i=0;i<42;i++){
+    const dt = new Date(start);
+    dt.setDate(start.getDate()+i);
+    days.push(dt);
+  }
+  return days;
+}
+function isFirstOrThirdSaturday(dt){
+  // dt is Saturday
+  const day = dt.getDate();
+  const firstSat = new Date(dt.getFullYear(), dt.getMonth(), 1);
+  // find first saturday date in month
+  let offset = (6 - firstSat.getDay() + 7) % 7; // 6 = Saturday
+  const firstSatDay = 1 + offset;
+  const thirdSatDay = firstSatDay + 14;
+  return day === firstSatDay || day === thirdSatDay;
+}
+function isHolidayDay(dt){
+  const key = ymd(dt.getFullYear(), dt.getMonth()+1, dt.getDate());
+  const dow = dt.getDay(); // Sun=0
+  const isSun = dow === 0;
+  const isSat = dow === 6;
+  const isFirstThirdSat = isSat && isFirstOrThirdSaturday(dt);
+  const hasHolidayName = !!holidayName(key);
+  return isSun || hasHolidayName || isFirstThirdSat;
+}
+function isRangeMarked(dt){
+  const r = state.ranges || {};
+  const obS = r.obonStart ? parseYmd(r.obonStart) : null;
+  const obE = r.obonEnd ? parseYmd(r.obonEnd) : null;
+  const nyS = r.nyStart ? parseYmd(r.nyStart) : null;
+  const nyE = r.nyEnd ? parseYmd(r.nyEnd) : null;
+
+  const e1S = r.extra1Start ? parseYmd(r.extra1Start) : null;
+  const e1E = r.extra1End ? parseYmd(r.extra1End) : null;
+  const e2S = r.extra2Start ? parseYmd(r.extra2Start) : null;
+  const e2E = r.extra2End ? parseYmd(r.extra2End) : null;
+
+  return (
+    betweenInclusive(dt, obS, obE) ||
+    betweenInclusive(dt, nyS, nyE) ||
+    betweenInclusive(dt, e1S, e1E) ||
+    betweenInclusive(dt, e2S, e2E)
+  );
+}
+function render(){
+  const y = state.viewYear, m = state.viewMonth;
+  $("#ym").textContent = monthLabel(y,m);
+
+  // ranges UI sync
+  $("#obonStart").value = state.ranges.obonStart || "";
+  $("#obonEnd").value = state.ranges.obonEnd || "";
+  $("#nyStart").value = state.ranges.nyStart || "";
+  $("#nyEnd").value = state.ranges.nyEnd || "";
+  $("#extra1Start").value = state.ranges.extra1Start || "";
+  $("#extra1End").value = state.ranges.extra1End || "";
+  $("#extra2Start").value = state.ranges.extra2Start || "";
+  $("#extra2End").value = state.ranges.extra2End || "";
+  $("#pInit").value = String(state.pInit ?? 10);
+
+  // holiday override status
+  const ov = getHolidayOverride();
+  $("#holidayStatus").textContent = ov ? `上書き: ${Object.keys(ov).length}件` : "上書き: なし";
+
+  calEl.innerHTML = "";
+  const days = buildCalendarDays(y,m);
+
+  days.forEach(dt=>{
+    const inMonth = (dt.getMonth()+1)===m;
+    const key = ymd(dt.getFullYear(), dt.getMonth()+1, dt.getDate());
+    const dayEl = document.createElement("div");
+    dayEl.className = "day" + (inMonth ? "" : " out");
+    dayEl.dataset.date = key;
+
+    const isHol = isHolidayDay(dt);
+    const marked = isRangeMarked(dt);
+    const isKDay = isHol || marked; // 公休に含める日
+
+    // subtle marking
+    if(isKDay){
+      dayEl.style.background = "radial-gradient(400px 220px at 20% 0%, rgba(255,80,120,.12), transparent 60%), rgba(255,255,255,.02)";
+    }
+    if(marked){
+      dayEl.style.boxShadow = "0 10px 28px rgba(0,0,0,.45), 0 0 0 2px rgba(80,255,190,.18) inset";
+    }
+
+    const dn = document.createElement("div");
+    dn.className = "dateNum";
+    dn.textContent = dt.getDate();
+    dayEl.appendChild(dn);
+
+    // holiday hint (fixed) + hover title
+    if(isKDay){
+      const hh = document.createElement("div");
+      hh.className = "holidayHint";
+
+// hover: show full reason (holiday name / range / sunday / sat)
+      const reasons = [];
+      const hnFull = holidayName(key);
+      if(hnFull) reasons.push(hnFull);
+      if(marked) reasons.push("休暇期間");
+      const dow = dt.getDay(); // Sun=0
+      if(!hnFull && !marked){
+        if(dow===0) reasons.push("日曜");
+        if(dow===6 && isFirstOrThirdSaturday(dt)) reasons.push("第1/第3土曜");
+      }
+      // if(reasons.length) hh.title = reasons.join(" / ");
+
+      dayEl.appendChild(hh);
+    }
+
+    // holiday name pill (right top)
+    const hn = document.createElement("div");
+    hn.className = "holidayName";
+    hn.textContent = holidayName(key);
+    const _hnFull = hn.textContent;
+    if(_hnFull){
+      //  hn.title = _hnFull; 
+    } else { hn.style.display = 'none'; }
+
+    dayEl.appendChild(hn);
+
+    // token lane (right top fixed)
+    const lane = document.createElement("div");
+    lane.className = "tokenLane";
+    lane.dataset.dropzone = "day";
+    lane.dataset.date = key;
+    dayEl.appendChild(lane);
+
+    // memo (マス内はプレビュー / クリックで拡大編集)
+    const memo = document.createElement("textarea");
+    memo.className = "memo";
+    memo.placeholder = "メモ";
+    memo.value = state.memos[key] || "";
+    memo.readOnly = true; // 直接入力でスクロールバーが出て幅を食うのを防ぐ
+    memo.addEventListener("click", ()=>{
+      openMemoModal(key, memo);
+    });
+    memo.addEventListener("focus", ()=>{
+      // キーボードでフォーカスされた場合もモーダルへ
+      memo.blur();
+      openMemoModal(key, memo);
+    });
+    dayEl.appendChild(memo);
+
+    // tokens in day
+    const arr = state.tokens[key] || [];
+    arr.forEach((t, idx)=>{
+      lane.appendChild(makeTokenEl(t, key, idx));
+    });
+
+    // DnD targets
+    dayEl.addEventListener("dragover", (e)=>{
+      e.preventDefault();
+      dayEl.classList.add("dragover");
+    });
+    dayEl.addEventListener("dragleave", ()=> dayEl.classList.remove("dragover"));
+    dayEl.addEventListener("drop", (e)=>{
+      e.preventDefault();
+      dayEl.classList.remove("dragover");
+      const payload = safeParse(e.dataTransfer.getData("text/plain"));
+      if(!payload) return;
+      handleDropToDay(payload, key);
+    });
+
+    calEl.appendChild(dayEl);
+  });
+
+  // pools
+  renderPools();
+  renderCounts();
+}
+
+function safeParse(raw){
+  try{ return JSON.parse(raw); }catch{ return null; }
+}
+
+/* ==========
+   Tokens
+   ========== */
+function makeTokenEl(type, dateKey, index){
+  const el = document.createElement("div");
+  el.className = `token ${type.toLowerCase()}`;
+  el.textContent = tokenLabel(type);
+  el.draggable = true;
+  el.dataset.type = type;
+  el.dataset.from = "day";
+  el.dataset.date = dateKey;
+  el.dataset.index = String(index);
+
+  el.addEventListener("dragstart", (e)=>{
+    e.dataTransfer.setData("text/plain", JSON.stringify({
+      type,
+      from: "day",
+      date: dateKey,
+      index,
+    }));
+  });
+  return el;
+}
+
+function makePoolTokenEl(type){
+  const el = document.createElement("div");
+  el.className = `token ${type.toLowerCase()}`;
+  el.textContent = tokenLabel(type);
+  el.draggable = true;
+  el.dataset.type = type;
+  el.dataset.from = "pool";
+  el.addEventListener("dragstart", (e)=>{
+    e.dataTransfer.setData("text/plain", JSON.stringify({
+      type,
+      from: "pool",
+    }));
+  });
+  return el;
+}
+
+function makeInfiniteTokenEl(type){
+  const el = document.createElement("div");
+  el.className = `token ${type.toLowerCase()}`;
+  el.textContent = tokenLabel(type);
+  el.draggable = true;
+  el.dataset.type = type;
+  el.dataset.from = "infinite";
+  el.addEventListener("dragstart", (e)=>{
+    e.dataTransfer.setData("text/plain", JSON.stringify({
+      type,
+      from: "infinite",
+    }));
+  });
+  return el;
+}
+
+/* ==========
+   Pools state: store as plain counts, render as tokens
+   ========== */
+function poolCounts(){
+  // pool counts are derived from special state fields:
+  // poolK: state.poolK (number), poolD: state.poolD, poolP: state.poolP
+  // but to keep compat, store them in seq bucket:
+  // We'll store explicit in state.pool = {K:...,D:...,P:...}
+  if(!state.pool) state.pool = {K:0,D:0,P:0};
+  // ensure numbers
+  ["K","D","P"].forEach(k=>{
+    if(typeof state.pool[k] !== "number") state.pool[k] = 0;
+  });
+  return state.pool;
+}
+function setPool(type, n){
+  const p = poolCounts();
+  p[type] = Math.max(0, Math.floor(n));
+  saveState();
+}
+function incPool(type, delta){
+  const p = poolCounts();
+  p[type] = Math.max(0, p[type] + delta);
+  saveState();
+}
+
+function renderPools(){
+  const p = poolCounts();
+  const poolK = $("#poolK"), poolD=$("#poolD"), poolP=$("#poolP");
+  const iconPool = $("#iconPool");
+  const trash = $("#trashBin");
+
+  [poolK,poolD,poolP].forEach(el=>el && (el.innerHTML=""));
+  if(iconPool) iconPool.innerHTML="";
+
+  for(let i=0;i<p.K;i++) poolK.appendChild(makePoolTokenEl("K"));
+  for(let i=0;i<p.D;i++) poolD.appendChild(makePoolTokenEl("D"));
+  for(let i=0;i<p.P;i++) poolP.appendChild(makePoolTokenEl("P"));
+
+  // 無限アイコンコマ（家/現/遊）
+  if(iconPool){
+    INFINITE_TYPES.forEach(t=> iconPool.appendChild(makeInfiniteTokenEl(t)));
+  }
+
+  // enable drop back to pools
+  [["K",poolK],["D",poolD],["P",poolP]].forEach(([type, el])=>{
+    if(!el) return;
+    el.addEventListener("dragover",(e)=>{ e.preventDefault(); el.classList.add("dragover"); });
+    el.addEventListener("dragleave",()=> el.classList.remove("dragover"));
+    el.addEventListener("drop",(e)=>{
+      e.preventDefault(); el.classList.remove("dragover");
+      const payload = safeParse(e.dataTransfer.getData("text/plain"));
+      if(!payload) return;
+      handleDropToPool(payload, type);
+    });
+  });
+
+  // trash bin
+  if(trash){
+    trash.addEventListener("dragover",(e)=>{ e.preventDefault(); trash.classList.add("dragover"); });
+    trash.addEventListener("dragleave",()=> trash.classList.remove("dragover"));
+    trash.addEventListener("drop",(e)=>{
+      e.preventDefault(); trash.classList.remove("dragover");
+      const payload = safeParse(e.dataTransfer.getData("text/plain"));
+      if(!payload) return;
+      handleDropToTrash(payload);
+    });
+  }
+}
+
+function renderCounts(){
+  const p = poolCounts();
+  $("#countK").textContent = String(p.K);
+  $("#countD").textContent = String(p.D);
+  $("#countP").textContent = String(p.P);
+  $("#counts").textContent = `K:${p.K} / D:${p.D} / P:${p.P}`;
+}
+
+/* ==========
+   Drop handlers
+   ========== */
+function handleDropToDay(payload, dateKey){
+  const type = payload.type;
+  if(!type) return;
+
+  // 1日1コマ制限（とりあえず）
+  if(!state.tokens[dateKey]) state.tokens[dateKey] = [];
+  if(state.tokens[dateKey].length >= 1){
+    toast("その日はもうコマが入ってるで");
+    return;
+  }
+
+  // from pool: consume 1 (K/D/P only)
+  if(payload.from === "pool"){
+    if(!POOL_TYPES.has(type)) return;
+    const p = poolCounts();
+    if(p[type] <= 0) { toast("そのコマ残ってない"); return; }
+    p[type] -= 1;
+    state.tokens[dateKey].push(type);
+    saveState();
+    render();
+    return;
+  }
+
+  // from infinite: unlimited icon tokens
+  if(payload.from === "infinite"){
+    state.tokens[dateKey].push(type);
+    saveState();
+    render();
+    return;
+  }
+
+  // from day: move between days
+  if(payload.from === "day"){
+    const fromDate = payload.date;
+    const idx = payload.index;
+    if(!fromDate || idx==null) return;
+    const arr = state.tokens[fromDate] || [];
+    const moved = arr.splice(idx,1)[0];
+    state.tokens[fromDate] = arr;
+    // destination already guaranteed empty by rule above
+    state.tokens[dateKey].push(moved);
+    saveState();
+    render();
+    return;
+  }
+}
+
+function handleDropToPool(payload, poolType){
+  // allow returning K/D/P back to pools
+  if(payload.from === "pool"){
+    // dropping pool to pool: no-op
+    return;
+  }
+  if(payload.from === "day"){
+    const fromDate = payload.date;
+    const idx = payload.index;
+    if(!fromDate || idx==null) return;
+    const arr = state.tokens[fromDate] || [];
+    const moved = arr.splice(idx,1)[0];
+    state.tokens[fromDate] = arr;
+
+    if(!POOL_TYPES.has(moved)){
+      // アイコンコマはプールに戻さず、そのまま破棄（=消える）
+      saveState();
+      render();
+      return;
+    }
+
+    const p = poolCounts();
+    p[moved] = (p[moved]||0) + 1;
+    saveState();
+    render();
+  }
+}
+
+/* ==========
+   公休生成・月末処理
+   ========== */
+function countHolidaySlotsOfMonth(y,m){
+  // 公休Kに含める日:
+  //  - 日曜
+  //  - 祝日（JSON）
+  //  - 第1/第3土曜
+  //  - 盆/正月/追加マーキング（期間）
+  const last = new Date(y, m, 0).getDate();
+  let cnt = 0;
+  for(let d=1; d<=last; d++){
+    const dt = new Date(y, m-1, d);
+    if(isHolidayDay(dt) || isRangeMarked(dt)) cnt++;
+  }
+  return cnt;
+}
+function clearTypeTokensInMonth(type, y, m){
+  const first = new Date(y, m-1, 1);
+  const lastDay = new Date(y, m, 0).getDate();
+  for(let d=1; d<=lastDay; d++){
+    const key = ymd(y, m, d);
+    const arr = state.tokens[key];
+    if(!arr || !arr.length) continue;
+    const filtered = arr.filter(t=>t!==type);
+    if(filtered.length) state.tokens[key] = filtered;
+    else delete state.tokens[key];
+  }
+  saveState();
+}
+
+function regenerateK(){
+  const y = state.viewYear, m = state.viewMonth;
+
+  // ③ 公休コマ再生成時：カレンダー内に置いたKは一旦ぜんぶ削除（数が増え過ぎるのを防ぐ）
+  clearTypeTokensInMonth("K", y, m);
+
+  const need = countHolidaySlotsOfMonth(y,m);
+  // poolK を月の必要数に上書き
+  setPool("K", need);
+  toast(`公休K: ${need} 個`);
+  render();
+}
+
+function monthEndProcess(){
+  // "余り公休→代休": poolK の残りを poolD に足して、poolK=0
+  const p = poolCounts();
+  const restK = p.K;
+  if(restK<=0){ toast("余り公休なし"); return; }
+  p.K = 0;
+  p.D += restK;
+  saveState();
+  toast(`余り公休 ${restK} → 代休へ`);
+  render();
+}
+
+function resetCurrentMonth(){
+  const y = state.viewYear, m = state.viewMonth;
+  const lastDay = new Date(y, m, 0).getDate();
+  const p = poolCounts();
+
+  for(let d=1; d<=lastDay; d++){
+    const key = ymd(y, m, d);
+    const arr = state.tokens[key];
+    if(arr && arr.length){
+      // 置いてたK/D/Pはプールへ返す
+      arr.forEach(t=>{
+        if(POOL_TYPES.has(t)) p[t] = (p[t]||0) + 1;
+      });
+      delete state.tokens[key];
+    }
+    if(state.memos && state.memos[key]) delete state.memos[key];
+  }
+
+  saveState();
+  toast("今月をリセットしたで");
+  render();
+}
+
+function handleDropToTrash(payload){
+  if(payload.from === "day"){
+    const fromDate = payload.date;
+    const idx = payload.index;
+    if(!fromDate || idx==null) return;
+    const arr = state.tokens[fromDate] || [];
+    const moved = arr.splice(idx,1)[0];
+    if(arr.length) state.tokens[fromDate] = arr;
+    else delete state.tokens[fromDate];
+
+    // K/D/P はプールに戻す
+    if(POOL_TYPES.has(moved)){
+      const p = poolCounts();
+      p[moved] = (p[moved]||0) + 1;
+    }
+    saveState();
+    toast("ゴミ箱に捨てた");
+    render();
+  }
+  // from pool / infinite は no-op（まだ数は減らしてない）
+}
+
+/* ==========
+   有給初期化
+   ========== */
+function applyPInit(){
+  const v = Math.max(0, Math.floor(Number($("#pInit").value || 0)));
+  state.pInit = v;
+  setPool("P", v);
+  toast(`有給P: ${v} 個`);
+  render();
+}
+
+/* ==========
+   Nav
+   ========== */
+function addMonth(delta){
+  let y = state.viewYear, m = state.viewMonth;
+  m += delta;
+  while(m<=0){ m+=12; y--; }
+  while(m>=13){ m-=12; y++; }
+  state.viewYear = y; state.viewMonth = m;
+  saveState();
+  render();
+}
+function goThisMonth(){
+  const t = new Date();
+  state.viewYear = t.getFullYear();
+  state.viewMonth = t.getMonth()+1;
+  saveState();
+  render();
+}
+
+/* ==========
+   Export / Import
+   ========== */
+function exportState(){
+  const blob = new Blob([JSON.stringify({state, holidayOverride: getHolidayOverride()}, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `koma_calendar_export_${state.viewYear}-${pad2(state.viewMonth)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function importState(){
+  const input = document.createElement("input");
+  input.type="file";
+  input.accept=".json,application/json";
+  input.onchange = async ()=>{
+    const f = input.files?.[0];
+    if(!f) return;
+    const txt = await f.text();
+    try{
+      const obj = JSON.parse(txt);
+      if(obj.state) state = obj.state;
+      else state = obj;
+      if(obj.holidayOverride){
+        setHolidayOverride(obj.holidayOverride);
+      }
+      saveState();
+      toast("インポート完了");
+      render();
+    }catch(e){
+      alert("インポート失敗: JSON形式が違うかも");
+    }
+  };
+  input.click();
+}
+
+/* ==========
+   Reset
+   ========== */
+function resetAll(){
+  if(!confirm("全部消す？（ローカル保存が初期化される）")) return;
+  localStorage.removeItem(STORAGE_KEY);
+  // holiday override is intentionally kept; user can clear from button
+  state = defaultState();
+  saveState();
+  toast("初期化した");
+  render();
+}
+
+/* ==========
+   盆/正月期間反映
+   ========== */
+function applyRanges(){
+  state.ranges.obonStart = $("#obonStart").value || "";
+  state.ranges.obonEnd = $("#obonEnd").value || "";
+  state.ranges.nyStart = $("#nyStart").value || "";
+  state.ranges.nyEnd = $("#nyEnd").value || "";
+
+  state.ranges.extra1Start = $("#extra1Start").value || "";
+  state.ranges.extra1End = $("#extra1End").value || "";
+  state.ranges.extra2Start = $("#extra2Start").value || "";
+  state.ranges.extra2End = $("#extra2End").value || "";
+
+  saveState();
+  toast("期間反映");
+  render();
+}
+
+/* ==========
+   祝日JSON読み込み
+   ========== */
+async function loadHolidayJsonFromFile(file){
+  const txt = await file.text();
+  const obj = JSON.parse(txt);
+  if(!obj || typeof obj !== "object") throw new Error("invalid json");
+  // validate key format loosely
+  const keys = Object.keys(obj);
+  if(keys.length === 0) throw new Error("empty json");
+  for(const k of keys.slice(0, 5)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) throw new Error("key format should be YYYY-MM-DD");
+  }
+  setHolidayOverride(obj);
+}
+
+/* ==========
+   Wire up
+   ========== */
+$("#prevBtn").addEventListener("click", ()=>addMonth(-1));
+$("#nextBtn").addEventListener("click", ()=>addMonth(1));
+$("#todayBtn").addEventListener("click", goThisMonth);
+
+$("#genKBtn").addEventListener("click", regenerateK);
+$("#monthEndBtn").addEventListener("click", monthEndProcess);
+$("#resetMonthBtn").addEventListener("click", ()=>{ if(confirm("今月のコマ＆メモを全部リセットする？")) resetCurrentMonth(); });
+const _rm2 = document.getElementById("resetMonthBtn2"); if(_rm2) _rm2.addEventListener("click", ()=>{ if(confirm("今月のコマ＆メモを全部リセットする？")) resetCurrentMonth(); });
+
+$("#dPlus").addEventListener("click", ()=>{ incPool("D", 1); toast("代休 +1"); render(); });
+$("#dMinus").addEventListener("click", ()=>{ incPool("D", -1); toast("代休 -1"); render(); });
+
+$("#pApply").addEventListener("click", applyPInit);
+
+$("#applyRanges").addEventListener("click", applyRanges);
+
+$("#exportBtn").addEventListener("click", exportState);
+$("#importBtn").addEventListener("click", importState);
+$("#resetBtn").addEventListener("click", resetAll);
+
+$("#loadHolidayJsonBtn").addEventListener("click", ()=> $("#holidayFile").click());
+$("#holidayFile").addEventListener("change", async (e)=>{
+  const f = e.target.files?.[0];
+  if(!f) return;
+  try{
+    await loadHolidayJsonFromFile(f);
+    toast("祝日JSONを読み込んだ");
+    render();
+  }catch(err){
+    console.error(err);
+    alert("祝日JSONの読み込みに失敗した（形式: {\"YYYY-MM-DD\":\"祝日名\"}）");
+  }finally{
+    e.target.value = "";
+  }
+});
+$("#clearHolidayJsonBtn").addEventListener("click", ()=>{
+  if(!confirm("祝日上書きを解除する？")) return;
+  clearHolidayOverride();
+  toast("上書きを解除した");
+  render();
+});
+
+
+/* ==========
+   Memo Modal wiring
+   ========== */
+(function wireMemoModal(){
+  const modal = document.getElementById("memoModal");
+  const back = document.querySelector("#memoModal .memoModalBack");
+  const closeBtn = document.getElementById("memoModalClose");
+  const input = document.getElementById("memoModalInput");
+  const saved = document.getElementById("memoModalSaved");
+  if(!modal || !back || !closeBtn || !input) return;
+
+  function setSavedLabel(text){
+    if(saved) saved.textContent = text;
+  }
+
+  closeBtn.addEventListener("click", closeMemoModal);
+  back.addEventListener("click", closeMemoModal);
+
+  document.addEventListener("keydown", (e)=>{
+    if(e.key === "Escape" && !modal.classList.contains("hidden")){
+      closeMemoModal();
+    }
+  });
+
+  let savedT = null;
+  input.addEventListener("input", ()=>{
+    if(!memoOpenKey) return;
+    state.memos[memoOpenKey] = input.value;
+    saveState();
+    if(memoOpenCellEl) memoOpenCellEl.value = input.value;
+    setSavedLabel("Saved ✓");
+    clearTimeout(savedT);
+    savedT = setTimeout(()=> setSavedLabel(""), 900);
+  });
+})();
+
+
+/* ==========
+   Boot
+   ========== */
+(function boot(){
+  // pool init: if pool doesn't exist, set initial P and generate K once
+  if(!state.pool){
+    state.pool = {K:0, D:0, P: state.pInit ?? 10};
+    saveState();
+  }
+  // first time: if K=0, auto-generate for current month
+  if((state.pool?.K ?? 0) === 0){
+    regenerateK();
+  }else{
+    render();
+  }
+})();
+</script>
+</body>
+</html>
